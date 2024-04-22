@@ -5,7 +5,7 @@ from preprocess import preprocess_split, N_FFT
 
 INPUT_SHAPE = (None, int((N_FFT / 2) + 1))
 OUTPUT_SHAPE = (None, 5)
-
+DROPOUT_RATIO = 0.1
 
 class BeatmapModel(Model):
 
@@ -15,15 +15,15 @@ class BeatmapModel(Model):
         self.model = Sequential([
             Input(shape=INPUT_SHAPE),
             Conv1D(64, kernel_size=3, activation='relu', padding='same'),
+            Dropout(DROPOUT_RATIO),
             BatchNormalization(),
-            Dropout(0.1),
             Conv1D(128, kernel_size=3, activation='relu', padding='same'),
+            Dropout(DROPOUT_RATIO),
             BatchNormalization(),
-            Dropout(0.1),
             LSTM(128, return_sequences=True),
-            Dropout(0.1),
+            Dropout(DROPOUT_RATIO),
             LSTM(5, return_sequences=True),
-            Dropout(0.1),
+            Dropout(DROPOUT_RATIO),
         ])
 
     def call(self, inputs):
