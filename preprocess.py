@@ -31,8 +31,6 @@ def vectorize_hit_objects(filename):
     1. x-coordinate
     2. y-coordinate
     3. time
-    4. object type
-    5. hit sound
 
     Note: Sliders are converted to hit circles.
     """
@@ -56,10 +54,7 @@ def vectorize_hit_objects(filename):
         time = int(elements[2])
 
         # Convert sliders to hit circles
-        object_type = int(elements[3]) & (~(1 << 1))
-
-        hit_sound = int(elements[4])
-        vector.append((x, y, time, object_type, hit_sound))
+        vector.append((time))
     return np.array(vector)
 
 
