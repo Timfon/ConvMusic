@@ -8,7 +8,7 @@ import zipfile
 import tempfile
 import concurrent.futures
 import numpy as np
-from tensorflow.keras.utils import pad_sequences  # type: ignore
+from keras.utils import pad_sequences  # type: ignore
 
 N_FFT = 512
 
@@ -36,7 +36,7 @@ def vectorize_hit_objects(filename):
 
     Note: Sliders are converted to hit circles.
     """
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf8") as f:
         content = f.read()
 
     start = content.find("[HitObjects]")

@@ -1,6 +1,6 @@
-from tensorflow.keras.layers import Input, LSTM, Conv1D, BatchNormalization, Dropout  # type: ignore
-from tensorflow.keras.models import Model, Sequential  # type: ignore
-from tensorflow.keras.utils import pad_sequences  # type: ignore
+from keras.layers import Input, LSTM, Conv1D, BatchNormalization, Dropout, Dense  # type: ignore
+from keras.models import Model, Sequential  # type: ignore
+from keras.utils import pad_sequences  # type: ignore
 from preprocess import preprocess_split, N_FFT
 
 INPUT_SHAPE = (None, int((N_FFT / 2) + 1))
@@ -24,6 +24,7 @@ class BeatmapModel(Model):
             Dropout(DROPOUT_RATIO),
             LSTM(5, return_sequences=True),
             Dropout(DROPOUT_RATIO),
+            Dense(5)
         ])
 
     def call(self, inputs):
