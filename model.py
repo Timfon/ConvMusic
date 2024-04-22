@@ -1,11 +1,13 @@
-from keras.layers import Input, LSTM, Conv1D, BatchNormalization, Dropout, Dense  # type: ignore
+from keras.layers import Input, LSTM, Conv1D, BatchNormalization, Dropout, Dense, Flatten  # type: ignore
 from keras.models import Model, Sequential  # type: ignore
 from keras.utils import pad_sequences  # type: ignore
-from preprocess import preprocess_split, N_FFT
+from preprocess import preprocess_split, MAX_SONG_LENGTH, TIME_QUANTA
+import tensorflow as tf  # type: ignore
 
-INPUT_SHAPE = (None, int((N_FFT / 2) + 1))
-OUTPUT_SHAPE = (None, 5)
+INPUT_SHAPE = (int(MAX_SONG_LENGTH / TIME_QUANTA),1)
+OUTPUT_SHAPE = (None, int(MAX_SONG_LENGTH / TIME_QUANTA))
 DROPOUT_RATIO = 0.1
+
 
 class BeatmapModel(Model):
 
@@ -14,20 +16,20 @@ class BeatmapModel(Model):
 
         self.model = Sequential([
             Input(shape=INPUT_SHAPE),
-            Conv1D(64, kernel_size=3, activation='relu', padding='same'),
-            Dropout(DROPOUT_RATIO),
+            Conv1D(64,
+                   kernel_size=32,
+                   activation='relu',
+                   padding='same',
+                   strides=2),
+            Flatten(),
+            # Dropout(DROPOUT_RATIO),
             BatchNormalization(),
-            Conv1D(128, kernel_size=3, activation='relu', padding='same'),
-            Dropout(DROPOUT_RATIO),
-            BatchNormalization(),
-            LSTM(128, return_sequences=True),
-            Dropout(DROPOUT_RATIO),
-            LSTM(5, return_sequences=True),
-            Dropout(DROPOUT_RATIO),
-            Dense(5)
+            Dense(128, activation='leaky_relu'),
+            Dense(OUTPUT_SHAPE[1], activation='leaky_relu')
         ])
 
     def call(self, inputs):
+        #print(inputs.shape)
         return self.model(inputs)
 
 
@@ -37,11 +39,12 @@ model.summary()
 
 # Preprocess the data
 TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split("beatmaps")
+# TRAIN_X is a (split*len(sample), MAX_SONG_LENGTH/TIME_QUANTA) array
 
 # Train the model
 model.fit(TRAIN_X,
           TRAIN_Y,
-          epochs=1,
+          epochs=10,
           batch_size=32,
           validation_data=(TEST_X, TEST_Y))
 
@@ -50,4 +53,5 @@ model.save("model.keras")
 
 # Run the model
 predictions = model.predict(TEST_X)
-print(predictions)
+print(TEST_Y[0][0:48])
+print(predictions[0][0:48])
