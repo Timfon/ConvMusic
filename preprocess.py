@@ -8,9 +8,12 @@ import zipfile
 import tempfile
 import concurrent.futures
 import numpy as np
+from tensorflow.keras.utils import pad_sequences  # type: ignore
+
+N_FFT = 512
 
 
-def extract_spectrogram(filename, hop_length=512, n_fft=2048):
+def extract_spectrogram(filename, hop_length=512, n_fft=N_FFT):
     """
     Returns the spectrogram of the audio file at the given filename.
     """
@@ -72,7 +75,9 @@ def process_beatmap(beatmap, beatmap_dir):
         for file in os.listdir(temp_dir):
             if file.endswith(".osu"):
                 osu_file = os.path.join(temp_dir, file)
-            elif file.endswith(".mp3") or file.endswith(".ogg"):
+            elif (file.endswith(".mp3") or file.endswith(".ogg")) and not (
+                    "hitwhistle" in file or "hitnormal" in file or "hitclap"
+                    in file or "hitfinish" in file or "sliderslide" in file):
                 audio_file = os.path.join(temp_dir, file)
 
         # Ensure both files were found
@@ -117,6 +122,14 @@ def preprocess_split(beatmap_dir, split=0.8):
     Preprocesses the beatmaps in the given directory and splits them into training and test sets.
     """
     X, Y = preprocess(beatmap_dir)
+
+    # Calculate max length of spectrogram and hit object vector
+    max_len = max(max([len(x) for x in X]), max([len(y) for y in Y]))
+
+    # Pad the sequences
+    X = pad_sequences(X, padding='post', dtype='float32', maxlen=max_len)
+    Y = pad_sequences(Y, padding='post', dtype='int32', maxlen=max_len)
+
     TRAIN_X, TRAIN_Y = X[:int(split * len(X))], Y[:int(split * len(Y))]
     TEST_X, TEST_Y = X[int(split * len(X)):], Y[int(split * len(Y)):]
     assert len(TRAIN_X) == len(TRAIN_Y)

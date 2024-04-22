@@ -2,3 +2,5 @@
 __pycache__/
 beatmaps/**/*
 env/
+*.h5
+*.keras
