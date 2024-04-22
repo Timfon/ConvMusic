@@ -26,9 +26,9 @@ def extract_decibals(sound, quanta=TIME_QUANTA):
     start_ms = 0
     while (start_ms + quanta <= MAX_SONG_LENGTH):
         if (start_ms < len(sound)):
-            output.append(sound[start_ms:start_ms+quanta].dBFS)
+            output.append(max(-100, sound[start_ms:start_ms+quanta].dBFS))
         else:
-            output.append(float('-inf')) # -inf is used as padding since pydub db is relative; 0db is the maximum loudness
+            output.append(-100) # -inf is used as padding since pydub db is relative; 0db is the maximum loudness
         start_ms += quanta
     return np.array(output)
 
