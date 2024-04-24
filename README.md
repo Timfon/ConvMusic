@@ -8,6 +8,8 @@ Contains:
 - Uses mean absolute error to train the model on the mp3 timestamps. 
 - Uses a custom mean squared error to train the model on the osu x and y coordinate positions. 
 
+![alt text](https://i.ppy.sh/aa2492bf0aff11430126954c853d64667f7de1a9/68747470733a2f2f6f73752e7070792e73682f77696b692f696d616765732f7368617265642f6f73752d67616d65706c61792e6a7067)
+
 ## Example usage:
 - Create a beatmaps/ directory in the same directory as model.py. 
 - Populate the directory with the osu beatmaps you want to train the model on. 
