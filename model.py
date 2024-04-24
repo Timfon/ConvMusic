@@ -80,8 +80,8 @@ class PositionModel(Model):
             Dense(HIDDEN_DIM, activation='relu'),
         ])
 
-        self.mu = Dense(LATENT_DIM, activation='relu')
-        self.log_var = Dense(LATENT_DIM, activation='relu')
+        self.mu = Dense(LATENT_DIM, activation='linear')
+        self.log_var = Dense(LATENT_DIM, activation='linear')
 
         self.decoder = Sequential([
             Dense(HIDDEN_DIM, activation='relu'),
@@ -96,10 +96,10 @@ class PositionModel(Model):
         mu = self.mu(x)
         log_var = self.log_var(x)
 
-        z = mu + tf.exp(log_var / 2) * tf.random.normal(mu.shape)
+        z = mu + tf.exp(log_var / 2) * tf.random.normal(tf.shape(mu))
 
         output = self.decoder(z)
-        return output, mu, log_var
+        return output
 
     def get_config(self):
         return {}
@@ -108,6 +108,7 @@ class PositionModel(Model):
 def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
 
     model = PositionModel()
+    model.compile(optimizer='adam', loss='mean_absolute_error')
     model.summary()
 
     def prepare_input(data_Y: np.ndarray) -> np.ndarray:
@@ -121,43 +122,10 @@ def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
 
     X = prepare_input(np.concatenate([TRAIN_Y, TEST_Y], axis=0))
 
-    def bce_function(x_hat, x):
-        bce_fn = BinaryCrossentropy(from_logits=False,
-                                    reduction=tf.losses.Reduction.SUM)
-        reconstruction_loss = bce_fn(x, x_hat) * x.shape[-1]
-        return reconstruction_loss
-
-    def loss_function(X: np.ndarray, output: np.ndarray, mu: np.ndarray,
-                      log_var: np.ndarray):
-        bce_loss = bce_function(output, X)
-        kl_div = -(1 / 2) * tf.reduce_sum(
-            1 + log_var - tf.square(mu) - tf.exp(log_var), axis=1)
-        print("bce_loss", bce_loss)
-        print("kl_div", tf.reduce_mean(kl_div))
-        loss = bce_loss + tf.reduce_mean(kl_div)
-        return bce_loss
-
-    EPOCHS = 10
-    optimizer = Adam(learning_rate=0.01)
-    for i in range(EPOCHS):
-        total_loss = 0
-        with tf.GradientTape() as tape:
-            output, mu, log_var = model(X)
-            loss = loss_function(X, output, mu, log_var) / len(X)
-            total_loss += loss
-        grads = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(
-            zip(
-                grads,  # type: ignore
-                model.trainable_variables))
-
-        print(f"Train Epoch: {i}, Loss: {total_loss / len(X)}")
+    model.fit(X, epochs=10)
 
     # Save the model
     model.save(POSITION_MODEL_PATH)
-
-    predictions = model.predict(X)
-    print(predictions)
 
 
 if __name__ == "__main__":
@@ -169,7 +137,7 @@ if __name__ == "__main__":
         print("Preprocessing beatmaps...")
         TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split(BEATMAPS_PATH)
 
-        # train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
+        train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
 
         train_position_model(TRAIN_Y, TEST_Y)
         sys.exit(0)
