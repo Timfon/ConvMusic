@@ -35,16 +35,6 @@ def extract_decibals(sound, quanta=TIME_QUANTA):
 
 
 def vectorize_hit_objects(filename, quanta=TIME_QUANTA):
-    """
-    Vectorizes the hit objects in the given osu file.
-    
-    Returns a list of tuples, each tuple containing the following elements:
-    1. x-coordinate
-    2. y-coordinate
-    3. time
-
-    Note: Sliders are converted to hit circles.
-    """
     with open(filename, "r", encoding="utf8") as f:
         content = f.read()
 
@@ -53,7 +43,7 @@ def vectorize_hit_objects(filename, quanta=TIME_QUANTA):
 
     section = content[start:].split("\n")[1:]
 
-    vector = []
+    hit_objects = []
 
     for line in section:
         if line.strip() == "":
@@ -65,16 +55,15 @@ def vectorize_hit_objects(filename, quanta=TIME_QUANTA):
         time = int(elements[2])
 
         # Convert sliders to hit circles
-        vector.append((time))
+        hit_objects.append((x, y, time))
     output = []
     start_ms = 0
     while (start_ms + quanta <= MAX_SONG_LENGTH):
-        has_hit = False
-        while (len(vector) > 0 and vector[0] >= start_ms
-               and vector[0] < start_ms + quanta):
-            has_hit = True
-            vector.pop(0)
-        output.append(1 if has_hit else 0)
+        obj = None
+        while (len(hit_objects) > 0 and hit_objects[0][2] >= start_ms
+               and hit_objects[0][2] < start_ms + quanta):
+            obj = hit_objects.pop(0)
+        output.append(obj if obj else (0, 0, 0))
         start_ms += quanta
     return np.array(output)
 
