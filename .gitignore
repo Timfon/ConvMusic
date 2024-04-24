@@ -6,3 +6,4 @@ env/
 *.keras
 *.mp3
 *.ogg
+*.osz

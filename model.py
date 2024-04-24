@@ -1,14 +1,15 @@
 from keras.layers import Input, BatchNormalization, Dropout, Dense, Flatten  # type: ignore
 from keras.models import Model, Sequential, load_model  # type: ignore
 from preprocess import extract_decibels, preprocess_split, MAX_SONG_LENGTH, TIME_QUANTA
-from output import output_osu_string, output_osu_file
+from output import generate_osu_file, create_osz
 import numpy as np
 import keras
-import tensorflow as tf 
+import tensorflow as tf
 
 OUTPUT_SHAPE = (None, int(MAX_SONG_LENGTH / TIME_QUANTA))
 
 BEATMAPS_PATH = "beatmaps"
+OUTPUT_PATH = "."
 TIMESTAMP_MODEL_PATH = "timestamp.keras"
 POSITION_MODEL_PATH = "position.keras"
 
@@ -81,14 +82,14 @@ class PositionModel(Model):
     def get_config(self):
         return {}
 
+
 @keras.saving.register_keras_serializable()
 def custom_mse(y_true, y_pred):
-    print("True: ", y_true)
-    print("True shape: ", y_true.shape)
     empty_entries = y_true == 0
     empty_entries = tf.cast(tf.where(empty_entries, 0, 1), tf.float32)
     y_pred *= empty_entries
     return keras.losses.mean_squared_error(y_true, y_pred)
+
 
 def train_position_model(TRAIN_X: np.ndarray, TRAIN_Y: np.ndarray,
                          TEST_X: np.ndarray, TEST_Y: np.ndarray):
@@ -183,17 +184,8 @@ if __name__ == "__main__":
 
     prediction = position_model.predict(position_model_input.reshape(1, -1))
 
-    print(max(prediction[0]))
     positions = list(map(lambda x: max(0, round(x)), prediction[0]))
 
-    count = 0
-    i = 0
-    while i < len(timestamps):
-        if timestamps[i] == 1:
-            count += 1
-            print(
-                f"{timestamps[i]}: {positions[i * 2]}, {positions[i * 2 + 1]}")
-        i += 1
-
-    osu_string = output_osu_string(timestamps, positions, song_file)
-    output_osu_file(osu_string, "output", song_file)
+    osu_string = generate_osu_file(timestamps, positions, song_file)
+    osz_path = create_osz(osu_string, song_file, OUTPUT_PATH)
+    print(f"Generated osz file at {osz_path}")

@@ -1,9 +1,9 @@
 from preprocess import MAX_SONG_LENGTH, TIME_QUANTA
 import os
-import shutil
 import zipfile
 
-def output_osu_string(timestamps, positions, audiofile_path):
+
+def generate_osu_file(timestamps, positions, audiofile_path):
     audiofile_path = os.path.basename(audiofile_path)
     song_name = ".".join(os.path.splitext(audiofile_path)[:-1])
     output_string = f'''osu file format v14
@@ -44,29 +44,29 @@ SliderTickRate:1
 
 [HitObjects]
 '''
-    
-# object format: x,y,time,type(1),hitSound(0),hitSample(0:0:0:0:)
-    assert(len(timestamps) == len(positions) / 2)
-    assert(len(timestamps) == int(MAX_SONG_LENGTH / TIME_QUANTA))
+
+    # object format: x,y,time,type(1),hitSound(0),hitSample(0:0:0:0:)
+    assert (len(timestamps) == len(positions) / 2)
+    assert (len(timestamps) == int(MAX_SONG_LENGTH / TIME_QUANTA))
     for quanta in range(0, int(MAX_SONG_LENGTH / TIME_QUANTA)):
         if (timestamps[quanta] == 0):
             continue
         new_hit_obj = f'{positions[quanta * 2]},{positions[quanta * 2 + 1]},{quanta*TIME_QUANTA},1,0,0:0:0:0:\n'
         output_string += new_hit_obj
     return output_string
-    
-def output_osu_file(osu_string, output_dir, song_path):
+
+
+def create_osz(osu_string, song_path, output_dir) -> str:
     song_name = os.path.basename(song_path)
     song_name = ".".join(os.path.splitext(song_name)[:-1])
 
-    #output_path = os.path.join(output_dir, song_name + ".osu")
     output_path = song_name + ".osu"
     with open(output_path, "w") as f:
         f.write(osu_string)
-    zip = zipfile.ZipFile(os.path.join(output_dir, song_name+".osz"), "w")
+    osz_path = os.path.join(output_dir, song_name + ".osz")
+    zip = zipfile.ZipFile(osz_path, "w")
     zip.write(output_path)
     zip.write(song_path)
     zip.close()
     os.remove(output_path)
-
-    
+    return osz_path
