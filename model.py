@@ -5,7 +5,10 @@ import numpy as np
 import keras
 
 OUTPUT_SHAPE = (None, int(MAX_SONG_LENGTH / TIME_QUANTA))
-DROPOUT_RATIO = 0.1
+
+BEATMAPS_PATH = "beatmaps"
+TIMESTAMP_MODEL_PATH = "timestamp.keras"
+POSITION_MODEL_PATH = "position.keras"
 
 
 @keras.saving.register_keras_serializable(package="convmusic")
@@ -14,6 +17,7 @@ class TimestampModel(Model):
     def __init__(self):
         super(TimestampModel, self).__init__()
         INPUT_SHAPE = (int(MAX_SONG_LENGTH / TIME_QUANTA), 1)
+        DROPOUT_RATIO = 0.1
 
         self.model = Sequential([
             Input(shape=INPUT_SHAPE),
@@ -31,22 +35,17 @@ class TimestampModel(Model):
         return {}
 
 
-def train_timestamp_model():
+def train_timestamp_model(TRAIN_X: np.ndarray, TRAIN_Y: np.ndarray,
+                          TEST_X: np.ndarray, TEST_Y: np.ndarray):
     model = TimestampModel()
     model.compile(optimizer='adam', loss='mean_absolute_error')
     model.summary()
 
-    # Preprocess the data
-    TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split("beatmaps")
+    def process_targets(data_Y: np.ndarray) -> np.ndarray:
+        return np.array([[(1 if y[2] > 0 else 0) for y in x] for x in data_Y])
 
-    TRAIN_Y = np.array(
-        list(
-            map(lambda x: list(map(lambda y: 1
-                                   if y[2] > 0 else 0, x)), TRAIN_Y)))
-    TEST_Y = np.array(
-        list(
-            map(lambda x: list(map(lambda y: 1
-                                   if y[2] > 0 else 0, x)), TEST_Y)))
+    TRAIN_Y = process_targets(TRAIN_Y)
+    TEST_Y = process_targets(TEST_Y)
 
     # Train the model
     model.fit(TRAIN_X,
@@ -56,7 +55,7 @@ def train_timestamp_model():
               validation_data=(TEST_X, TEST_Y))
 
     # Save the model
-    model.save("timestamp.keras")
+    model.save(TIMESTAMP_MODEL_PATH)
 
 
 @keras.saving.register_keras_serializable(package="convmusic")
@@ -71,65 +70,45 @@ class PositionModel(Model):
         self.model = Sequential([
             Input(shape=INPUT_SHAPE),
             Dense(128, activation='linear'),
-            Dense(OUTPUT_SHAPE[1] * 2, activation='linear')
+            Dense(2 * OUTPUT_SHAPE[1], activation='linear')
         ])
 
     def call(self, inputs):  # type: ignore
-        print(inputs.shape)
         return self.model(inputs)
 
     def get_config(self):
         return {}
 
 
-def train_position_model():
+def train_position_model(TRAIN_X: np.ndarray, TRAIN_Y: np.ndarray,
+                         TEST_X: np.ndarray, TEST_Y: np.ndarray):
     model = PositionModel()
     model.compile(optimizer='adam', loss='mean_squared_error')
     model.summary()
 
-    # Preprocess the data
-    TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split("beatmaps")
+    def prepare_features(data_X: np.ndarray, data_Y: np.ndarray) -> np.ndarray:
+        new_data_X = []
+        for current_x, current_y in zip(data_X, data_Y):
+            sample = []
+            for x, y in zip(current_x, current_y):
+                sample += [x, 1 if y[2] > 0 else 0]
+            new_data_X.append(sample)
+        return np.array(new_data_X)
 
-    NEW_TRAIN_X = []
-    for i in range(len(TRAIN_X)):
-        current_x = TRAIN_X[i]
-        current_y = TRAIN_Y[i]
-        sample = []
-        for x, y in zip(current_x, current_y):
-            sample += [x, 1 if y[2] > 0 else 0]
-        NEW_TRAIN_X.append(sample)
-    TRAIN_X = np.array(NEW_TRAIN_X)
+    def prepare_targets(data_Y: np.ndarray) -> np.ndarray:
+        new_data_Y = []
+        for current_y in data_Y:
+            sample = []
+            for y in current_y:
+                sample += [y[0], y[1]]
+            new_data_Y.append(sample)
+        return np.array(new_data_Y)
 
-    NEW_TEST_X = []
-    for i in range(len(TEST_X)):
-        current_x = TEST_X[i]
-        current_y = TEST_Y[i]
-        sample = []
-        for x, y in zip(current_x, current_y):
-            sample += [x, 1 if y[2] > 0 else 0]
-        NEW_TEST_X.append(sample)
-    TEST_X = np.array(NEW_TEST_X)
+    TRAIN_X = prepare_features(TRAIN_X, TRAIN_Y)
+    TEST_X = prepare_features(TEST_X, TEST_Y)
 
-    NEW_TRAIN_Y = []
-    for i in range(len(TRAIN_Y)):
-        current_y = TRAIN_Y[i]
-        sample = []
-        for y in current_y:
-            sample += [y[0], y[1]]
-        NEW_TRAIN_Y.append(sample)
-    TRAIN_Y = np.array(NEW_TRAIN_Y)
-
-    NEW_TEST_Y = []
-    for i in range(len(TEST_Y)):
-        current_y = TEST_Y[i]
-        sample = []
-        for y in current_y:
-            sample += [y[0], y[1]]
-        NEW_TEST_Y.append(sample)
-    TEST_Y = np.array(NEW_TEST_Y)
-
-    print(TRAIN_X[0])
-    print(TRAIN_X[0][0:200])
+    TRAIN_Y = prepare_targets(TRAIN_Y)
+    TEST_Y = prepare_targets(TEST_Y)
 
     # Train the model
     model.fit(TRAIN_X,
@@ -139,7 +118,7 @@ def train_position_model():
               validation_data=(TEST_X, TEST_Y))
 
     # Save the model
-    model.save("position.keras")
+    model.save(POSITION_MODEL_PATH)
 
 
 if __name__ == "__main__":
@@ -148,8 +127,12 @@ if __name__ == "__main__":
     from pydub import AudioSegment
 
     if "--train" in sys.argv:
-        # train_timestamp_model()
-        train_position_model()
+        print("Preprocessing beatmaps...")
+        TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split(BEATMAPS_PATH)
+
+        train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
+
+        train_position_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
         sys.exit(0)
 
     if len(sys.argv) != 2:
@@ -189,6 +172,7 @@ if __name__ == "__main__":
     position_model_input = np.array(position_model_input)
 
     prediction = position_model.predict(position_model_input.reshape(1, -1))
+
     print(max(prediction[0]))
     positions = list(map(lambda x: max(0, round(x)), prediction[0]))
 

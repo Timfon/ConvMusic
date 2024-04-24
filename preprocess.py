@@ -8,6 +8,7 @@ import tempfile
 import concurrent.futures
 import numpy as np
 from pydub import AudioSegment
+from tqdm import tqdm
 
 N_FFT = 512
 TIME_QUANTA = 30  # miliseconds
@@ -124,7 +125,7 @@ def preprocess(beatmap_dir, max_workers=4):
             for beatmap in beatmaps
         }
 
-        for future in concurrent.futures.as_completed(future_to_beatmap):
+        for future in tqdm(concurrent.futures.as_completed(future_to_beatmap)):
             result = future.result()
             if result is not None:
                 decibels.append(result[0])
