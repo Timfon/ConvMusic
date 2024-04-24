@@ -4,6 +4,7 @@ from preprocess import extract_decibels, preprocess_split, MAX_SONG_LENGTH, TIME
 from output import output_osu_string, output_osu_file
 import numpy as np
 import keras
+import tensorflow as tf 
 
 OUTPUT_SHAPE = (None, int(MAX_SONG_LENGTH / TIME_QUANTA))
 
@@ -80,11 +81,19 @@ class PositionModel(Model):
     def get_config(self):
         return {}
 
+@keras.saving.register_keras_serializable()
+def custom_mse(y_true, y_pred):
+    print("True: ", y_true)
+    print("True shape: ", y_true.shape)
+    empty_entries = y_true == 0
+    empty_entries = tf.cast(tf.where(empty_entries, 0, 1), tf.float32)
+    y_pred *= empty_entries
+    return keras.losses.mean_squared_error(y_true, y_pred)
 
 def train_position_model(TRAIN_X: np.ndarray, TRAIN_Y: np.ndarray,
                          TEST_X: np.ndarray, TEST_Y: np.ndarray):
     model = PositionModel()
-    model.compile(optimizer='adam', loss='mean_squared_error')
+    model.compile(optimizer='adam', loss=custom_mse)
     model.summary()
 
     def prepare_features(data_X: np.ndarray, data_Y: np.ndarray) -> np.ndarray:
