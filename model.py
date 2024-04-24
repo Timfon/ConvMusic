@@ -69,7 +69,7 @@ class PositionModel(Model):
         INPUT_SHAPE = (2 * int(MAX_SONG_LENGTH / TIME_QUANTA), )
 
         HIDDEN_DIM = 128
-        LATENT_DIM = int(MAX_SONG_LENGTH / TIME_QUANTA) // 4
+        LATENT_DIM = int(MAX_SONG_LENGTH / TIME_QUANTA) // 8
 
         self.encoder = Sequential([
             Input(shape=INPUT_SHAPE),
@@ -85,9 +85,22 @@ class PositionModel(Model):
             Dense(HIDDEN_DIM, activation='relu'),
             Dense(HIDDEN_DIM, activation='relu'),
             Dense(HIDDEN_DIM, activation='relu'),
-            Dense(INPUT_SHAPE[0], activation='relu'),
+            Dense(INPUT_SHAPE[0], activation='linear'),
             Reshape(INPUT_SHAPE)
         ])
+
+        self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
+        self.reconstruction_loss_tracker = keras.metrics.Mean(
+            name="reconstruction_loss")
+        self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+
+    @property
+    def metrics(self):
+        return [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.kl_loss_tracker,
+        ]
 
     def call(self, inputs):  # type: ignore
         x = self.encoder(inputs)
@@ -96,8 +109,39 @@ class PositionModel(Model):
 
         z = mu + tf.exp(log_var / 2) * tf.random.normal(tf.shape(mu))
 
-        output = self.decoder(z)
-        return output
+        return self.decoder(z)
+
+    def train_step(self, data):
+        with tf.GradientTape() as tape:
+            x = self.encoder(data)
+            mu = self.mu(x)
+            log_var = self.log_var(x)
+
+            z = mu + tf.exp(log_var / 2) * tf.random.normal(tf.shape(mu))
+
+            reconstruction = self.decoder(z)
+
+            bce_fn = tf.keras.losses.BinaryCrossentropy(
+                from_logits=False,
+                reduction=tf.keras.losses.Reduction.SUM,
+            )
+            reconstruction_loss = bce_fn(data, reconstruction)
+
+            kl_loss = -0.5 * tf.reduce_sum(
+                1 + log_var - tf.square(mu) - tf.exp(log_var), axis=1)
+            kl_loss = tf.reduce_mean(kl_loss)
+            total_loss = reconstruction_loss + kl_loss
+        grads = tape.gradient(total_loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(
+            grads, self.trainable_weights))  # type: ignore
+        self.total_loss_tracker.update_state(total_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+        return {
+            "loss": self.total_loss_tracker.result(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+        }
 
     def get_config(self):
         return {}
@@ -106,7 +150,7 @@ class PositionModel(Model):
 def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
 
     model = PositionModel()
-    model.compile(optimizer='adam', loss='binary_crossentropy')
+    model.compile(optimizer='adam')
     model.summary()
 
     def prepare_input(data_Y: np.ndarray) -> np.ndarray:
@@ -120,7 +164,7 @@ def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
 
     X = prepare_input(np.concatenate([TRAIN_Y, TEST_Y], axis=0))
 
-    model.fit(X, X, epochs=50)
+    model.fit(X, epochs=20)
 
     # Save the model
     model.save(POSITION_MODEL_PATH)
@@ -128,7 +172,7 @@ def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
     predictions = model.predict(X)
     predictions = predictions[0]
 
-    print(predictions[0:100])
+    print(list(map(lambda x: 0 if x < 0 else round(x), predictions[0:100])))
     print(X[0][0:100])
 
 
@@ -141,7 +185,7 @@ if __name__ == "__main__":
         print("Preprocessing beatmaps...")
         TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split(BEATMAPS_PATH)
 
-        # train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
+        train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
 
         train_position_model(TRAIN_Y, TEST_Y)
         sys.exit(0)
