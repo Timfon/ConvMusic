@@ -1,6 +1,7 @@
 from keras.layers import Input, BatchNormalization, Dropout, Dense, Flatten  # type: ignore
 from keras.models import Model, Sequential, load_model  # type: ignore
 from preprocess import extract_decibels, preprocess_split, MAX_SONG_LENGTH, TIME_QUANTA
+from output import output_osu_string, output_osu_file
 import numpy as np
 import keras
 
@@ -113,7 +114,7 @@ def train_position_model(TRAIN_X: np.ndarray, TRAIN_Y: np.ndarray,
     # Train the model
     model.fit(TRAIN_X,
               TRAIN_Y,
-              epochs=10,
+              epochs=20,
               batch_size=32,
               validation_data=(TEST_X, TEST_Y))
 
@@ -184,3 +185,6 @@ if __name__ == "__main__":
             print(
                 f"{timestamps[i]}: {positions[i * 2]}, {positions[i * 2 + 1]}")
         i += 1
+
+    osu_string = output_osu_string(timestamps, positions, song_file)
+    output_osu_file(osu_string, "output", song_file)

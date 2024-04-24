@@ -64,7 +64,6 @@ def output_osu_file(osu_string, output_dir, song_path):
     with open(output_path, "w") as f:
         f.write(osu_string)
     zip = zipfile.ZipFile(os.path.join(output_dir, song_name+".osz"), "w")
-    print(output_path)
     zip.write(output_path)
     zip.write(song_path)
     zip.close()
