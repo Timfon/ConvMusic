@@ -185,6 +185,12 @@ if __name__ == "__main__":
     prediction = position_model.predict(position_model_input.reshape(1, -1))
 
     positions = list(map(lambda x: max(0, round(x)), prediction[0]))
+    for i in range(len(positions)):
+        if (i % 2 == 0):
+            positions[i] = min(positions[i], 512)
+        else:
+            positions[i] = min(positions[i], 384)
+    
 
     osu_string = generate_osu_file(timestamps, positions, song_file)
     osz_path = create_osz(osu_string, song_file, OUTPUT_PATH)
