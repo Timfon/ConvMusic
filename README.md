@@ -1,4 +1,4 @@
-##Osu Mapper
+# Osu Mapper
 ## Team members: Timothy Fong, Michael Rehmet, Bokai Bi, Edward Wibowo
 
 ## Description:
