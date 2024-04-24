@@ -1,7 +1,5 @@
 from keras.layers import Input, BatchNormalization, Dropout, Dense, Flatten, Reshape  # type: ignore
 from keras.models import Model, Sequential, load_model  # type: ignore
-from keras.optimizers import Adam  # type: ignore
-from keras.losses import BinaryCrossentropy  # type: ignore
 from preprocess import extract_decibels, preprocess_split, MAX_SONG_LENGTH, TIME_QUANTA
 import numpy as np
 import keras
