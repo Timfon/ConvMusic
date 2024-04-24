@@ -14,9 +14,9 @@ TIME_QUANTA = 30  # miliseconds
 MAX_SONG_LENGTH = 1000 * 120
 
 
-def extract_decibals(sound, quanta=TIME_QUANTA):
+def extract_decibels(sound, quanta=TIME_QUANTA):
     """
-    Returns a list of average interval decibals for the given file, each interval is quanta long
+    Returns a list of average interval decibels for the given file, each interval is quanta long
     Song is truncated to MAX_SONG_LENGTH
     """
 
@@ -95,12 +95,12 @@ def process_beatmap(beatmap, beatmap_dir):
                 sound = AudioSegment.from_mp3(audio_file)
             else:
                 raise Exception(
-                    f'Unknown file ending {audio_file[-3:]} encountered in extract decibals'
+                    f'Unknown file ending {audio_file[-3:]} encountered in extract decibels'
                 )
 
-            decibals = extract_decibals(sound)
+            decibels = extract_decibels(sound)
             hit_object_vector = vectorize_hit_objects(osu_file)
-            return decibals, hit_object_vector
+            return decibels, hit_object_vector
         else:
             return None, None  # or handle missing files as needed
 
@@ -110,7 +110,7 @@ def preprocess(beatmap_dir, max_workers=4):
     Preprocesses the beatmaps in the given directory.
     Each beatmap should be in .osz format.
     """
-    decibals = []
+    decibels = []
     hit_objects = []
     beatmaps = [
         beatmap for beatmap in os.listdir(beatmap_dir)
@@ -127,10 +127,10 @@ def preprocess(beatmap_dir, max_workers=4):
         for future in concurrent.futures.as_completed(future_to_beatmap):
             result = future.result()
             if result is not None:
-                decibals.append(result[0])
+                decibels.append(result[0])
                 hit_objects.append(result[1])
 
-    return np.array(decibals), np.array(hit_objects)
+    return np.array(decibels), np.array(hit_objects)
 
 
 def preprocess_split(beatmap_dir, split=0.8):

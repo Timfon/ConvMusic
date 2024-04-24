@@ -4,3 +4,5 @@ beatmaps/**/*
 env/
 *.h5
 *.keras
+*.mp3
+*.ogg

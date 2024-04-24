@@ -1,13 +1,14 @@
-from keras.layers import Input, LSTM, Conv1D, BatchNormalization, Dropout, Dense, Flatten  # type: ignore
-from keras.models import Model, Sequential  # type: ignore
-from preprocess import preprocess_split, MAX_SONG_LENGTH, TIME_QUANTA
-import tensorflow as tf  # type: ignore
+from keras.layers import Input, BatchNormalization, Dropout, Dense, Flatten  # type: ignore
+from keras.models import Model, Sequential, load_model  # type: ignore
+from preprocess import extract_decibels, preprocess_split, MAX_SONG_LENGTH, TIME_QUANTA
 import numpy as np
+import keras
 
 OUTPUT_SHAPE = (None, int(MAX_SONG_LENGTH / TIME_QUANTA))
 DROPOUT_RATIO = 0.1
 
 
+@keras.saving.register_keras_serializable(package="convmusic")
 class TimestampModel(Model):
 
     def __init__(self):
@@ -25,6 +26,9 @@ class TimestampModel(Model):
 
     def call(self, inputs):  # type: ignore
         return self.model(inputs)
+
+    def get_config(self):
+        return {}
 
 
 def train_timestamp_model():
@@ -55,6 +59,7 @@ def train_timestamp_model():
     model.save("timestamp.keras")
 
 
+@keras.saving.register_keras_serializable(package="convmusic")
 class PositionModel(Model):
 
     def __init__(self):
@@ -65,32 +70,27 @@ class PositionModel(Model):
 
         self.model = Sequential([
             Input(shape=INPUT_SHAPE),
-            Dense(256, activation='leaky_relu'),
+            Dense(727, activation='leaky_relu'),
+            Dense(514, activation='leaky_relu'),
             Dense(128, activation='leaky_relu'),
             Dense(OUTPUT_SHAPE[1] * 2, activation='leaky_relu')
         ])
 
     def call(self, inputs):  # type: ignore
+        print(inputs.shape)
         return self.model(inputs)
+
+    def get_config(self):
+        return {}
 
 
 def train_position_model():
     model = PositionModel()
-    model.compile(optimizer='adam', loss='log_cosh')
+    model.compile(optimizer='adam', loss='mean_absolute_error')
     model.summary()
 
     # Preprocess the data
     TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split("beatmaps")
-
-    # TRAIN_X = [
-    #            [db1, db2, ..., db4000],
-    #            [db1, db2, ..., db4000],
-    #           ]
-
-    # TRAIN_X = [
-    #            [db1, t1, db2, t2, ..., db4000, t4000],
-    #            [db1, t1, db2, t2, ..., db4000, t4000],
-    #           ]
 
     NEW_TRAIN_X = []
     for i in range(len(TRAIN_X)):
@@ -98,7 +98,7 @@ def train_position_model():
         current_y = TRAIN_Y[i]
         sample = []
         for x, y in zip(current_x, current_y):
-            sample += [x, y[2]]
+            sample += [x, 1 if y[2] > 0 else 0]
         NEW_TRAIN_X.append(sample)
     TRAIN_X = np.array(NEW_TRAIN_X)
 
@@ -108,20 +108,9 @@ def train_position_model():
         current_y = TEST_Y[i]
         sample = []
         for x, y in zip(current_x, current_y):
-            sample += [x, y[2]]
+            sample += [x, y[2] if y[2] > 0 else 0]
         NEW_TEST_X.append(sample)
     TEST_X = np.array(NEW_TEST_X)
-
-    # TRAIN_Y = [
-    #            [T1, T2, ..., T4000],
-    #            [T1, T2, ..., T4000],
-    #           ]
-    # Ti = (xi, yi, ti)
-
-    # TRAIN_Y = [
-    #           [x1, y1, x2, y2, ..., x4000, y4000],
-    #           [x1, y1, x2, y2, ..., x4000, y4000],
-    #       ]
 
     NEW_TRAIN_Y = []
     for i in range(len(TRAIN_Y)):
@@ -141,27 +130,8 @@ def train_position_model():
         NEW_TEST_Y.append(sample)
     TEST_Y = np.array(NEW_TEST_Y)
 
-    # train_y_timestamp = np.array(
-    # list(
-    # map(lambda x: list(map(lambda y: 1
-    # if y[2] > 0 else 0, x)), TRAIN_Y)))
-    # test_y_timestamp = np.array(
-    # list(
-    # map(lambda x: list(map(lambda y: 1
-    # if y[2] > 0 else 0, x)), TEST_Y)))
-
-    # train_y_pos = np.array(
-    # list(map(lambda x: list(map(lambda y: y[0:2], x)), TRAIN_Y)))
-    # test_y_pos = np.array(
-    # list(map(lambda x: list(map(lambda y: y[0:2], x)), TEST_Y)))
-
-    # TRAIN_Y = np.concatenate((train_y_pos, train_y_timestamp), axis=1)
-    # TEST_Y = np.concatenate((test_y_pos, test_y_timestamp), axis=1)
-
-    print(TRAIN_X.shape)
-    print(TRAIN_Y.shape)
-    print(TEST_X.shape)
-    print(TEST_Y.shape)
+    print(TRAIN_X[0])
+    print(TRAIN_X[0][0:200])
 
     # Train the model
     model.fit(TRAIN_X,
@@ -173,16 +143,89 @@ def train_position_model():
     # Save the model
     model.save("position.keras")
 
-    predictions = model.predict(TEST_X)
+    # prediction = model.predict(TEST_X)
+    # prediction = prediction[0]
 
-    print("predicted: ", predictions[0])
-    print("expected: ", TEST_Y[0])
-    print("predicted: ", sum(predictions[0]))
-    print(
-        "predicted: ",
-        sum(list(map(lambda x: 0
-                     if x < 0 else round(x), list(predictions[0])))))
-    print("expected: ", sum(TEST_Y[0]))
+    # print(prediction)
+    # print(sum(prediction))
+    # print(max(prediction))
 
 
-train_position_model()
+if __name__ == "__main__":
+    import sys
+    import os
+    from pydub import AudioSegment
+
+    if "--train" in sys.argv:
+        # train_timestamp_model()
+        train_position_model()
+        sys.exit(0)
+
+    if len(sys.argv) != 2:
+        print("Usage: python model.py <song_file>")
+        sys.exit(1)
+
+    song_file = sys.argv[1]
+    assert os.path.isfile(song_file), "Song file not found."
+
+    if (song_file[-3:] == "ogg"):
+        sound = AudioSegment.from_ogg(song_file)
+    elif (song_file[-3:] == "mp3"):
+        sound = AudioSegment.from_mp3(song_file)
+    else:
+        raise Exception(
+            f'Unknown file ending {song_file[-3:]} encountered in extract decibels'
+        )
+
+    assert (os.path.isfile("timestamp.keras")
+            or not os.path.isfile("position.keras")
+            ), "Models not found. Please run with --train to train models."
+
+    timestamp_model: TimestampModel = load_model(
+        "timestamp.keras")  # type: ignore
+    position_model: PositionModel = load_model(
+        "position.keras")  # type: ignore
+
+    decibels = extract_decibels(sound)
+
+    # Predict timestamps
+    timestamps = np.array(
+        list(
+            map(
+                lambda x: min(1, max(0, round(x))),
+                timestamp_model(decibels.reshape(1, decibels.shape[0],
+                                                 1)).numpy()[0])))
+
+    prediction = timestamp_model.predict(decibels.reshape(1, -1))
+    timestamps = list(map(lambda x: min(1, max(0, round(x))), prediction[0]))
+
+    # Predict positions
+    position_model_input = []
+    for i in range(len(timestamps)):
+        position_model_input += [decibels[i], timestamps[i]]
+    position_model_input = np.array(position_model_input)
+
+    print(position_model_input[0:200])
+
+    prediction = position_model.predict(position_model_input.reshape(1, -1))
+    prediction = prediction[0]
+    print(prediction)
+    print(sum(prediction))
+    print(max(prediction))
+
+    # print(position_model_input[0:200])
+
+    # print(position_model_input.shape)
+    # print(position_model_input.reshape(1, len(position_model_input)).shape)
+
+    # positions = np.array(
+    # list(
+    # map(
+    # lambda x: 0 if x < 0 else round(x),
+    # position_model(
+    # position_model_input.reshape(
+    # 1, len(position_model_input))).numpy()[0])))
+
+    # print(positions)
+    # print(sum(positions))
+    # print(positions[0:200])
