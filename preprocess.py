@@ -1,34 +1,35 @@
 """
 Preprocesses beatmaps in .osz format.
 """
-import librosa
 import numpy as np
 import os
 import zipfile
 import tempfile
 import concurrent.futures
 import numpy as np
-from keras.utils import pad_sequences  # type: ignore
 from pydub import AudioSegment
 
 N_FFT = 512
-TIME_QUANTA = 30 # miliseconds
+TIME_QUANTA = 30  # miliseconds
 MAX_SONG_LENGTH = 1000 * 120
+
 
 def extract_decibals(sound, quanta=TIME_QUANTA):
     """
     Returns a list of average interval decibals for the given file, each interval is quanta long
     Song is truncated to MAX_SONG_LENGTH
     """
-    
+
     sound = sound[:MAX_SONG_LENGTH]
     output = []
     start_ms = 0
     while (start_ms + quanta <= MAX_SONG_LENGTH):
         if (start_ms < len(sound)):
-            output.append(max(-100, sound[start_ms:start_ms+quanta].dBFS))
+            output.append(max(-100, sound[start_ms:start_ms + quanta].dBFS))
         else:
-            output.append(-100) # -inf is used as padding since pydub db is relative; 0db is the maximum loudness
+            output.append(
+                -100
+            )  # -inf is used as padding since pydub db is relative; 0db is the maximum loudness
         start_ms += quanta
     return np.array(output)
 
@@ -69,7 +70,8 @@ def vectorize_hit_objects(filename, quanta=TIME_QUANTA):
     start_ms = 0
     while (start_ms + quanta <= MAX_SONG_LENGTH):
         has_hit = False
-        while (len(vector) > 0 and vector[0] >= start_ms and vector[0] < start_ms + quanta):
+        while (len(vector) > 0 and vector[0] >= start_ms
+               and vector[0] < start_ms + quanta):
             has_hit = True
             vector.pop(0)
         output.append(1 if has_hit else 0)
@@ -96,7 +98,6 @@ def process_beatmap(beatmap, beatmap_dir):
 
         # Ensure both files were found
         if osu_file and audio_file:
-            #print("-----------------------------------------Audio file ", audio_file)
             assert os.path.isfile(audio_file)
             sound = AudioSegment.empty()
             if (audio_file[-3:] == "ogg"):
@@ -104,8 +105,10 @@ def process_beatmap(beatmap, beatmap_dir):
             elif (audio_file[-3:] == "mp3"):
                 sound = AudioSegment.from_mp3(audio_file)
             else:
-                raise("Unknown file ending ", audio_file[-3:], " encountered in extract decibals")
-            
+                raise Exception(
+                    f'Unknown file ending {audio_file[-3:]} encountered in extract decibals'
+                )
+
             decibals = extract_decibals(sound)
             hit_object_vector = vectorize_hit_objects(osu_file)
             return decibals, hit_object_vector
@@ -146,13 +149,6 @@ def preprocess_split(beatmap_dir, split=0.8):
     Preprocesses the beatmaps in the given directory and splits them into training and test sets.
     """
     X, Y = preprocess(beatmap_dir)
-
-    # Calculate max length of spectrogram and hit object vector
-    #max_len = max(max([len(x) for x in X]), max([len(y) for y in Y]))
-
-    # Pad the sequences
-    #X = pad_sequences(X, padding='post', dtype='float32', maxlen=max_len)
-    #Y = pad_sequences(Y, padding='post', dtype='int32', maxlen=max_len)
 
     TRAIN_X, TRAIN_Y = X[:int(split * len(X))], Y[:int(split * len(Y))]
     TEST_X, TEST_Y = X[int(split * len(X)):], Y[int(split * len(Y)):]
