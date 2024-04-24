@@ -69,6 +69,5 @@ def output_osu_file(osu_string, output_dir, song_path):
     zip.write(song_path)
     zip.close()
     os.remove(output_path)
-    os.remove(song_path)
 
     
