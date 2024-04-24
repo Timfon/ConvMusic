@@ -69,7 +69,7 @@ class PositionModel(Model):
         INPUT_SHAPE = (2 * int(MAX_SONG_LENGTH / TIME_QUANTA), )
 
         HIDDEN_DIM = 128
-        LATENT_DIM = int(MAX_SONG_LENGTH / TIME_QUANTA) // 8
+        LATENT_DIM = 15
 
         self.encoder = Sequential([
             Input(shape=INPUT_SHAPE),
@@ -78,8 +78,8 @@ class PositionModel(Model):
             Dense(HIDDEN_DIM, activation='relu'),
         ])
 
-        self.mu = Dense(LATENT_DIM, activation='linear')
-        self.log_var = Dense(LATENT_DIM, activation='linear')
+        self.mu = Dense(LATENT_DIM, activation='relu')
+        self.log_var = Dense(LATENT_DIM, activation='sigmoid')
 
         self.decoder = Sequential([
             Dense(HIDDEN_DIM, activation='relu'),
@@ -121,16 +121,21 @@ class PositionModel(Model):
 
             reconstruction = self.decoder(z)
 
-            bce_fn = tf.keras.losses.BinaryCrossentropy(
-                from_logits=False,
-                reduction=tf.keras.losses.Reduction.SUM,
-            )
-            reconstruction_loss = bce_fn(data, reconstruction)
+            reconstruction_loss = tf.reduce_mean(
+                keras.losses.binary_crossentropy(data, reconstruction))
 
-            kl_loss = -0.5 * tf.reduce_sum(
-                1 + log_var - tf.square(mu) - tf.exp(log_var), axis=1)
+            # tf.print(log_var)
+            # tf.print(tf.exp(log_var))
+            # tf.print(-0.5 * (1 + log_var - tf.square(mu) - tf.exp(log_var)))
+            # tf.print(
+            # tf.reduce_mean(
+            # -0.5 * (1 + log_var - tf.square(mu) - tf.exp(log_var))))
+
+            kl_loss = -0.5 * (1 + log_var - tf.square(mu) - tf.exp(log_var))
             kl_loss = tf.reduce_mean(kl_loss)
+
             total_loss = reconstruction_loss + kl_loss
+
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(
             grads, self.trainable_weights))  # type: ignore
@@ -185,7 +190,7 @@ if __name__ == "__main__":
         print("Preprocessing beatmaps...")
         TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split(BEATMAPS_PATH)
 
-        train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
+        # train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
 
         train_position_model(TRAIN_Y, TEST_Y)
         sys.exit(0)
