@@ -70,10 +70,8 @@ class PositionModel(Model):
 
         self.model = Sequential([
             Input(shape=INPUT_SHAPE),
-            Dense(727, activation='leaky_relu'),
-            Dense(514, activation='leaky_relu'),
-            Dense(128, activation='leaky_relu'),
-            Dense(OUTPUT_SHAPE[1] * 2, activation='leaky_relu')
+            Dense(128, activation='linear'),
+            Dense(OUTPUT_SHAPE[1] * 2, activation='linear')
         ])
 
     def call(self, inputs):  # type: ignore
@@ -86,7 +84,7 @@ class PositionModel(Model):
 
 def train_position_model():
     model = PositionModel()
-    model.compile(optimizer='adam', loss='mean_absolute_error')
+    model.compile(optimizer='adam', loss='mean_squared_error')
     model.summary()
 
     # Preprocess the data
@@ -108,7 +106,7 @@ def train_position_model():
         current_y = TEST_Y[i]
         sample = []
         for x, y in zip(current_x, current_y):
-            sample += [x, y[2] if y[2] > 0 else 0]
+            sample += [x, 1 if y[2] > 0 else 0]
         NEW_TEST_X.append(sample)
     TEST_X = np.array(NEW_TEST_X)
 
@@ -142,13 +140,6 @@ def train_position_model():
 
     # Save the model
     model.save("position.keras")
-
-    # prediction = model.predict(TEST_X)
-    # prediction = prediction[0]
-
-    # print(prediction)
-    # print(sum(prediction))
-    # print(max(prediction))
 
 
 if __name__ == "__main__":
@@ -188,14 +179,6 @@ if __name__ == "__main__":
 
     decibels = extract_decibels(sound)
 
-    # Predict timestamps
-    timestamps = np.array(
-        list(
-            map(
-                lambda x: min(1, max(0, round(x))),
-                timestamp_model(decibels.reshape(1, decibels.shape[0],
-                                                 1)).numpy()[0])))
-
     prediction = timestamp_model.predict(decibels.reshape(1, -1))
     timestamps = list(map(lambda x: min(1, max(0, round(x))), prediction[0]))
 
@@ -205,27 +188,15 @@ if __name__ == "__main__":
         position_model_input += [decibels[i], timestamps[i]]
     position_model_input = np.array(position_model_input)
 
-    print(position_model_input[0:200])
-
     prediction = position_model.predict(position_model_input.reshape(1, -1))
-    prediction = prediction[0]
-    print(prediction)
-    print(sum(prediction))
-    print(max(prediction))
+    print(max(prediction[0]))
+    positions = list(map(lambda x: max(0, round(x)), prediction[0]))
 
-    # print(position_model_input[0:200])
-
-    # print(position_model_input.shape)
-    # print(position_model_input.reshape(1, len(position_model_input)).shape)
-
-    # positions = np.array(
-    # list(
-    # map(
-    # lambda x: 0 if x < 0 else round(x),
-    # position_model(
-    # position_model_input.reshape(
-    # 1, len(position_model_input))).numpy()[0])))
-
-    # print(positions)
-    # print(sum(positions))
-    # print(positions[0:200])
+    count = 0
+    i = 0
+    while i < len(timestamps):
+        if timestamps[i] == 1:
+            count += 1
+            print(
+                f"{timestamps[i]}: {positions[i * 2]}, {positions[i * 2 + 1]}")
+        i += 1
