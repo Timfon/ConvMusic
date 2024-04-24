@@ -1,11 +1,15 @@
 from preprocess import MAX_SONG_LENGTH, TIME_QUANTA
 import os
+import shutil
+import zipfile
 
-def output_osu_string(timestamps, positions, audiofile_name, song_name):
+def output_osu_string(timestamps, positions, audiofile_path):
+    audiofile_path = os.path.basename(audiofile_path)
+    song_name = ".".join(os.path.splitext(audiofile_path)[:-1])
     output_string = f'''osu file format v14
 
 [General]
-AudioFilename: {audiofile_name}
+AudioFilename: {audiofile_path}
 AudioLeadIn: 0
 PreviewTime: 33312
 Countdown: 0
@@ -51,9 +55,20 @@ SliderTickRate:1
         output_string += new_hit_obj
     return output_string
     
-def output_osu_file(osu_string, output_dir, song_name):
-    path = os.path.join(output_dir, song_name)
-    path += ".osu"
-    with open(path, "w") as f:
+def output_osu_file(osu_string, output_dir, song_path):
+    song_name = os.path.basename(song_path)
+    song_name = ".".join(os.path.splitext(song_name)[:-1])
+
+    #output_path = os.path.join(output_dir, song_name + ".osu")
+    output_path = song_name + ".osu"
+    with open(output_path, "w") as f:
         f.write(osu_string)
+    zip = zipfile.ZipFile(os.path.join(output_dir, song_name+".osz"), "w")
+    print(output_path)
+    zip.write(output_path)
+    zip.write(song_path)
+    zip.close()
+    os.remove(output_path)
+    os.remove(song_path)
+
     
