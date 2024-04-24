@@ -85,7 +85,7 @@ class PositionModel(Model):
             Dense(HIDDEN_DIM, activation='relu'),
             Dense(HIDDEN_DIM, activation='relu'),
             Dense(HIDDEN_DIM, activation='relu'),
-            Dense(INPUT_SHAPE[0], activation='sigmoid'),
+            Dense(INPUT_SHAPE[0], activation='relu'),
             Reshape(INPUT_SHAPE)
         ])
 
@@ -106,7 +106,7 @@ class PositionModel(Model):
 def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
 
     model = PositionModel()
-    model.compile(optimizer='adam', loss='mean_absolute_error')
+    model.compile(optimizer='adam', loss='binary_crossentropy')
     model.summary()
 
     def prepare_input(data_Y: np.ndarray) -> np.ndarray:
@@ -120,10 +120,16 @@ def train_position_model(TRAIN_Y: np.ndarray, TEST_Y: np.ndarray):
 
     X = prepare_input(np.concatenate([TRAIN_Y, TEST_Y], axis=0))
 
-    model.fit(X, epochs=10)
+    model.fit(X, X, epochs=50)
 
     # Save the model
     model.save(POSITION_MODEL_PATH)
+
+    predictions = model.predict(X)
+    predictions = predictions[0]
+
+    print(predictions[0:100])
+    print(X[0][0:100])
 
 
 if __name__ == "__main__":
@@ -135,7 +141,7 @@ if __name__ == "__main__":
         print("Preprocessing beatmaps...")
         TRAIN_X, TRAIN_Y, TEST_X, TEST_Y = preprocess_split(BEATMAPS_PATH)
 
-        train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
+        # train_timestamp_model(TRAIN_X, TRAIN_Y, TEST_X, TEST_Y)
 
         train_position_model(TRAIN_Y, TEST_Y)
         sys.exit(0)
